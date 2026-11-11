@@ -177,6 +177,30 @@ target framework проекта, а инструмент объединяет в
 NuGet разрешает конфликты версий («nearest wins»), инструмент берёт
 первую найденную нижнюю границу; `max_depth` в NuGet отсутствует.
 
+### Результаты сравнения с dotnet list package
+
+Сравнение выполнено при `max_depth = 10`. Штатный инструмент запускался
+в консольном проекте на net11.0 командой
+`dotnet list package --include-transitive`.
+
+| Пакет                              | dotnet: транзитивные пакеты                    | depgraph: пакетов в графе (с корнем) |
+|------------------------------------|------------------------------------------------|--------------------------------------|
+| Polly 8.4.0                        | Polly.Core 8.4.0                               | 83                                   |
+| Microsoft.Extensions.Logging 8.0.0 | Microsoft.Extensions.DependencyInjection 8.0.0 | 88                                   |
+| Serilog.Sinks.File 5.0.0           | Serilog 2.10.0                                 | 78                                   |
+
+Результаты расходятся. Файл `.nuspec` хранит зависимости в группах по
+target framework. NuGet выбирает одну группу, подходящую проекту, а
+depgraph объединяет зависимости всех групп, в том числе старых
+`netstandard1.x`, откуда приходит большое дерево пакетов `System.*`,
+`NETStandard.Library` и `runtime.*`.
+
+Из-за объединения групп в графе появляются циклы, которых нет внутри
+одной группы. Пример для Microsoft.Extensions.Logging:
+`System.Memory -> System.Numerics.Vectors -> NETStandard.Library ->
+System.Net.Http -> System.Diagnostics.DiagnosticSource -> System.Memory`.
+Инструмент обрывает такой цикл и помечает его `(cycle)` в ASCII-дереве.
+
 ## 5. Структура репозитория
 
     src/depgraph/   исходный код (config, nuget, testrepo, graph,

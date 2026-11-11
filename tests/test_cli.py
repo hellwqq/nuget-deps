@@ -3,6 +3,7 @@
 import contextlib
 import io
 import os
+import shutil
 import unittest
 
 from depgraph.cli import EXIT_ERROR, EXIT_OK, main
@@ -23,6 +24,10 @@ def example(name):
     return os.path.join(ROOT, "examples", name)
 
 
+HAS_DOT = shutil.which("dot") is not None
+
+
+@unittest.skipUnless(HAS_DOT, "Graphviz is not installed")
 class CliTestCase(unittest.TestCase):
     """Runs the tool on the example test repositories."""
 
@@ -34,15 +39,17 @@ class CliTestCase(unittest.TestCase):
 
     def test_simple(self):
         """The simple example prints its edges."""
-        code, out, _ = run_cli("-c", example("simple.ini"))
+        code, out, _ = run_cli("-c", example("simple.ini"), "--edges")
         self.assertEqual(code, EXIT_OK)
         self.assertIn("C -> D E", out)
+        self.assertIn("`-- C", out)
 
     def test_cycle(self):
         """The cyclic example finishes."""
-        code, out, _ = run_cli("-c", example("cycle.ini"))
+        code, out, _ = run_cli("-c", example("cycle.ini"), "--edges")
         self.assertEqual(code, EXIT_OK)
         self.assertIn("C -> A D", out)
+        self.assertIn("(cycle)", out)
 
     def test_direct(self):
         """--direct prints only direct dependencies."""
@@ -58,6 +65,12 @@ class CliTestCase(unittest.TestCase):
             [line.split()[1] for line in out.splitlines()],
             ["F", "E", "D", "B", "C", "A"],
         )
+
+    def test_png_created(self):
+        """A PNG file is produced next to the DOT file."""
+        run_cli("-c", example("diamond.ini"))
+        for suffix in (".png", ".dot"):
+            self.assertTrue(os.path.isfile(example("diamond" + suffix)))
 
     def test_error_exit_code(self):
         """Errors give exit code 1 and a message on stderr."""

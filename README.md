@@ -8,7 +8,7 @@ CLI-инструмент на Python 3 (только стандартная би
 конфигурационному файлу INI получает зависимости пакета .NET (NuGet),
 строит граф зависимостей и визуализирует его.
 
-Статус: **этап 4** (порядок загрузки зависимостей).
+Статус: **все 5 этапов выполнены**.
 
 ## 2. Настройки (`config.ini`, секция `[settings]`)
 
@@ -27,7 +27,9 @@ CLI-инструмент на Python 3 (только стандартная би
 
 ## 3. Сборка и тесты
 
-Сборка не нужна. Тесты:
+Сборка не нужна. Требуется Python 3.9+ и установленный Graphviz
+(утилита `dot` в `PATH`) для получения PNG. Тесты (стандартный
+`unittest`; тесты, которым нужен `dot`, пропускаются без Graphviz):
 
     make test
 
@@ -37,6 +39,7 @@ CLI-инструмент на Python 3 (только стандартная би
     ./run.sh -c my.ini
     ./run.sh --show-config        # дополнительно вывести параметры
     ./run.sh --direct             # только прямые зависимости (этап 2)
+    ./run.sh --edges              # граф в виде «пакет -> зависимости»
     ./run.sh --load-order         # порядок загрузки (этап 4)
 
 Пример вывода этапа 1:
@@ -118,3 +121,67 @@ CLI-инструмент на Python 3 (только стандартная би
   инструмент берёт версию при первом обнаружении (BFS).
 * NuGet не ограничивает глубину и сообщает о циклах ошибкой NU1108,
   инструмент обрывает цикл и выводит предупреждение.
+
+### Этап 5: визуализация
+
+После построения графа (всегда) инструмент:
+
+1. формирует описание на языке Graphviz и сохраняет его в `*.dot` рядом
+   с PNG (`visualize.to_dot`);
+2. сохраняет изображение в PNG-файл `output_file` (`dot -Tpng`);
+3. при `ascii_tree = true` печатает ASCII-дерево: `(cycle)` — ребро
+   замыкает цикл, `(*)` — поддерево уже было напечатано выше.
+
+Пример (`./run.sh -c examples/diamond.ini`):
+
+    A
+    |-- B
+    |   `-- D
+    |       `-- E
+    |           `-- F
+    `-- C
+        `-- D (*)
+    graph saved: examples/diamond.png, examples/diamond.dot
+
+DOT для `examples/simple.ini`:
+
+    digraph "A" {
+        rankdir=LR;
+        node [shape=box];
+        "A" -> "B";
+        "A" -> "C";
+        "B" -> "D";
+        "C" -> "D";
+        "C" -> "E";
+        "D";
+        "E";
+    }
+
+Файлы `*.png` и `*.dot` — результат запуска, в репозиторий не входят
+(см. `.gitignore`).
+
+**Три реальных пакета** (нужен доступ к nuget.org):
+
+    ./run.sh -c examples/nuget-logging.ini      # Microsoft.Extensions.Logging 8.0.0
+    ./run.sh -c examples/nuget-serilog-file.ini # Serilog.Sinks.File 5.0.0
+    ./run.sh -c examples/nuget-polly.ini        # Polly 8.4.0
+
+**Сравнение со штатными средствами NuGet:**
+
+    dotnet add package <имя> --version <версия>
+    dotnet list package --include-transitive
+    dotnet nuget why <проект> <пакет>
+
+Возможные расхождения: `dotnet list` показывает зависимости только для
+target framework проекта, а инструмент объединяет все группы `.nuspec`;
+NuGet разрешает конфликты версий («nearest wins»), инструмент берёт
+первую найденную нижнюю границу; `max_depth` в NuGet отсутствует.
+
+## 5. Структура репозитория
+
+    src/depgraph/   исходный код (config, nuget, testrepo, graph,
+                    loadorder, visualize, cli)
+    tests/          модульные тесты
+    examples/       тестовые репозитории и конфиги
+    config.ini      конфиг по умолчанию
+    run.sh          запуск;  Makefile — `make run`, `make test`

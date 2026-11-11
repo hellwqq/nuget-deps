@@ -1,4 +1,4 @@
-"""Command line interface of the tool (stage 4)."""
+"""Command line interface of the tool (stage 5)."""
 
 import argparse
 import sys
@@ -9,6 +9,7 @@ from .graph import build_graph, format_edges
 from .loadorder import find_cycle_edges, load_order
 from .nuget import NuGetSource
 from .testrepo import FileSource, load_test_repository
+from .visualize import ascii_tree, dot_path, save_visualization
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -35,6 +36,10 @@ def build_parser():
     parser.add_argument(
         "--load-order", action="store_true",
         help="print the order in which dependencies are loaded",
+    )
+    parser.add_argument(
+        "--edges", action="store_true",
+        help="print the graph as 'package -> dependencies' lines",
     )
     return parser
 
@@ -67,6 +72,14 @@ def print_load_order(graph):
         print(f"warning: cycle {source_name} -> {target}", file=sys.stderr)
 
 
+def visualize(graph, config):
+    """Print the ASCII tree if enabled and save DOT and PNG files."""
+    if config.ascii_tree:
+        print(ascii_tree(graph))
+    save_visualization(graph, config.output_file)
+    print(f"graph saved: {config.output_file}, {dot_path(config.output_file)}")
+
+
 def run(args):
     """Execute the tool for already parsed arguments."""
     config = load_config(args.config)
@@ -80,7 +93,9 @@ def run(args):
     if args.load_order:
         print_load_order(graph)
         return
-    print("\n".join(format_edges(graph)))
+    if args.edges:
+        print("\n".join(format_edges(graph)))
+    visualize(graph, config)
 
 
 def main(argv=None):

@@ -8,7 +8,7 @@ the requested package version is downloaded and parsed.
 import json
 import urllib.error
 import urllib.request
-import xml.etree.ElementTree as ET
+from xml.etree import ElementTree
 
 from .errors import RepositoryError
 
@@ -77,8 +77,8 @@ def local_name(tag):
 def parse_dependencies(data):
     """Return ``[(id, version_range)]`` found in a .nuspec document."""
     try:
-        root = ET.fromstring(data)
-    except ET.ParseError as exc:
+        root = ElementTree.fromstring(data)
+    except ElementTree.ParseError as exc:
         raise RepositoryError(f"invalid .nuspec document: {exc}") from exc
     found = {}
     for element in root.iter():

@@ -21,10 +21,13 @@ BASE = {
 class ConfigTestCase(unittest.TestCase):
     """Checks every parameter of the INI file."""
 
-    def setUp(self):
-        """Create a temporary folder for config files."""
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
+    @property
+    def tmp(self):
+        """Temporary folder for config files, created on first use."""
+        if not hasattr(self, "_tmp"):
+            self._tmp = tempfile.TemporaryDirectory()
+            self.addCleanup(self._tmp.cleanup)
+        return self._tmp
 
     def write(self, **changes):
         """Write an INI file with ``changes`` applied to the defaults."""

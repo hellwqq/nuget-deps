@@ -50,6 +50,15 @@ class CliTestCase(unittest.TestCase):
         self.assertEqual(code, EXIT_OK)
         self.assertEqual(out.split(), ["B", "C"])
 
+    def test_load_order(self):
+        """--load-order prints dependencies before dependents."""
+        code, out, _ = run_cli("-c", example("diamond.ini"), "--load-order")
+        self.assertEqual(code, EXIT_OK)
+        self.assertEqual(
+            [line.split()[1] for line in out.splitlines()],
+            ["F", "E", "D", "B", "C", "A"],
+        )
+
     def test_error_exit_code(self):
         """Errors give exit code 1 and a message on stderr."""
         code, _, err = run_cli("-c", "missing.ini")

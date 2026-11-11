@@ -1,4 +1,4 @@
-"""Command line interface of the tool (stage 3)."""
+"""Command line interface of the tool (stage 4)."""
 
 import argparse
 import sys
@@ -6,6 +6,7 @@ import sys
 from .config import format_config, load_config
 from .errors import DepGraphError, RepositoryError
 from .graph import build_graph, format_edges
+from .loadorder import find_cycle_edges, load_order
 from .nuget import NuGetSource
 from .testrepo import FileSource, load_test_repository
 
@@ -31,6 +32,10 @@ def build_parser():
         "--direct", action="store_true",
         help="print only direct dependencies of the package",
     )
+    parser.add_argument(
+        "--load-order", action="store_true",
+        help="print the order in which dependencies are loaded",
+    )
     return parser
 
 
@@ -54,6 +59,14 @@ def print_direct(source, name):
         print(f"{dep} {source.versions.get(dep, '')}".strip())
 
 
+def print_load_order(graph):
+    """Print the load order and warn about dependency cycles."""
+    for position, name in enumerate(load_order(graph), start=1):
+        print(f"{position}. {name}")
+    for source_name, target in find_cycle_edges(graph):
+        print(f"warning: cycle {source_name} -> {target}", file=sys.stderr)
+
+
 def run(args):
     """Execute the tool for already parsed arguments."""
     config = load_config(args.config)
@@ -64,6 +77,9 @@ def run(args):
         print_direct(source, config.package_name)
         return
     graph = build_graph(source, config.package_name, config.max_depth)
+    if args.load_order:
+        print_load_order(graph)
+        return
     print("\n".join(format_edges(graph)))
 
 

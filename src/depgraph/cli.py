@@ -1,11 +1,13 @@
-"""Command line interface of the tool (stage 2)."""
+"""Command line interface of the tool (stage 3)."""
 
 import argparse
 import sys
 
 from .config import format_config, load_config
-from .errors import DepGraphError
+from .errors import DepGraphError, RepositoryError
+from .graph import build_graph, format_edges
 from .nuget import NuGetSource
+from .testrepo import FileSource, load_test_repository
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -25,13 +27,31 @@ def build_parser():
         "--show-config", action="store_true",
         help="print all user parameters as key = value",
     )
+    parser.add_argument(
+        "--direct", action="store_true",
+        help="print only direct dependencies of the package",
+    )
     return parser
+
+
+def make_source(config):
+    """Create the dependency source for the selected mode."""
+    if config.test_mode:
+        packages = load_test_repository(config.repository)
+        if config.package_name not in packages:
+            raise RepositoryError(
+                f"package {config.package_name} is not in the test repository"
+            )
+        return FileSource(packages)
+    return NuGetSource(
+        config.repository, config.package_name, config.version
+    )
 
 
 def print_direct(source, name):
     """Print the direct dependencies of ``name``."""
     for dep in source.dependencies(name):
-        print(f"{dep} {source.versions[dep]}")
+        print(f"{dep} {source.versions.get(dep, '')}".strip())
 
 
 def run(args):
@@ -39,10 +59,12 @@ def run(args):
     config = load_config(args.config)
     if args.show_config:
         print("\n".join(format_config(config)))
-    source = NuGetSource(
-        config.repository, config.package_name, config.version
-    )
-    print_direct(source, config.package_name)
+    source = make_source(config)
+    if args.direct:
+        print_direct(source, config.package_name)
+        return
+    graph = build_graph(source, config.package_name, config.max_depth)
+    print("\n".join(format_edges(graph)))
 
 
 def main(argv=None):
